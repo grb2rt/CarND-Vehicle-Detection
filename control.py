@@ -7,6 +7,7 @@ import glob
 import time
 from scipy.ndimage.measurements import label
 
+
 import lesson_functions
 # call lesson_functions.extract_features()
 # Arguments
@@ -24,11 +25,11 @@ import lesson_functions
 
 color_space = 'LUV' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
 #spatial_size = (16, 16) # Spatial binning dimensions
-spatial_size = (25, 25) # Spatial binning dimensions
+spatial_size = (15, 15) # Spatial binning dimensions
 #hist_bins = 13    # Number of histogram bins
 hist_bins = 32    # Number of histogram bins
-orient = 15  # HOG orientations
-#orient = 9  # HOG orientations
+#orient = 15  # HOG orientations
+orient = 5  # HOG orientations
 pix_per_cell = 16 # HOG pixels per cell
 cell_per_block = 2 # HOG cells per block
 hog_channel = 0 # Can be 0, 1, 2, or "ALL"
@@ -40,7 +41,8 @@ hog_feat = True # HOG features on or off
 # (image, 'HSV', (16,16), 24, 8, 8, 2, 'ALL', True, True, True)
 # the final size is 5544 features per image
 
-dyn_lim = 0.25
+dyn_lim = 0.2 # percentage of detections to locate object
+abs_threshold = 100 # no of min detections to detect object
 
 import makegrid
 # function returns all regions to search in a 1280x720px image
@@ -51,10 +53,37 @@ import detect
 # Call detect.make_learnlist with the parameter samle_size to
 # get back a list of cars and non-cars
 # sample_size = 7880 # for making the carlist for training and validation
-sample_size = 500 # for making the carlist for training and validation
+sample_size = 8000 # for making the carlist for training and validation
 
 import heatmap
 # Creating the heatmap rectangles
+
+
+#######################
+# create documentation structure - goal: to have everything in one folder for documentation of the run
+#######################
+
+import datetime
+import os
+
+x = str(datetime.datetime.now())
+folder = x[0:10]+"_"+x[11:13]+"_"+x[14:16]
+os.makedirs(folder)
+os.makedirs(folder+"/spat/")
+os.makedirs(folder+"/hist/")
+os.makedirs(folder+"/hog/")
+os.makedirs(folder+"/all/")
+os.makedirs(folder+"/output/")
+os.makedirs(folder+"/testpic/")
+
+import shutil
+shutil.copyfile('control.py', folder+'/control.py') 
+shutil.copyfile('detect.py', folder+'/detect.py') 
+shutil.copyfile('heatmap.py', folder+'/heatmap.py') 
+shutil.copyfile('lesson_functions.py', folder+'/lesson_functions.py') 
+shutil.copyfile('makegrid.py', folder+'/makegrid.py') 
+
+
 
 #######################
 # Train
@@ -110,23 +139,23 @@ print("hot_windows found: " +str(len(hot_windows )))
 
 # Drawing the identified rectangles on the image
 window_img = lesson_functions.draw_boxes(draw_image, hot_windows_spat, color=(255, 0, 255), thick=2)                    
-cv2.imwrite(test_file_name+'_spat.jpg', window_img)
+cv2.imwrite(folder+'/testpic/'+test_file_name+'_spat.jpg', window_img)
 window_img = lesson_functions.draw_boxes(draw_image, hot_windows_hist, color=(0, 255, 255), thick=2)                    
-cv2.imwrite(test_file_name+'_hist.jpg', window_img)
+cv2.imwrite(folder+'/testpic/'+test_file_name+'_hist.jpg', window_img)
 window_img = lesson_functions.draw_boxes(draw_image, hot_windows_hog , color=(255, 255, 0), thick=2)                    
-cv2.imwrite(test_file_name+'_hog.jpg', window_img)
+cv2.imwrite(folder+'/testpic/'+test_file_name+'_hog.jpg', window_img)
 window_img = lesson_functions.draw_boxes(draw_image, hot_windows, color=(0, 0, 255), thick=2)                    
-cv2.imwrite(test_file_name+'_All_criteria.jpg', window_img)
+cv2.imwrite(folder+'/testpic/'+test_file_name+'_All_criteria.jpg', window_img)
 # document single image output
 
 # consolidate heatmap
 #threshold = 6
 #threshold = 150
 dyn_threshold = int(burning_windows*dyn_lim) # 15% of all frames must be overlapping object for detection
-labels = heatmap.heathot(hot_windows, test_image, dyn_threshold)
+labels, heat_max = heatmap.heathot(hot_windows, test_image, dyn_threshold, abs_threshold)
 
 draw_img = heatmap.draw_labeled_bboxes(test_image_png, labels)
-cv2.imwrite(test_file_name+'_heatmap.jpg', draw_img)
+cv2.imwrite(folder+'/testpic/'+test_file_name+'_heatmap.jpg', draw_img)
 
 
 from moviepy.editor import VideoFileClip
@@ -165,18 +194,36 @@ def videopipe(video_image):
     hot_windows.extend(hot_windows_hog )
     burning_windows = len(hot_windows)
 
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
 #    '''	# for debugging:
     # Drawing the identified rectangles on the image
     window_img = lesson_functions.draw_boxes(draw_image, hot_windows_spat, color=(255, 0, 255), thick=2)                    
-    cv2.imwrite('video_caps/spat_'+str(nnn)+'.jpg', window_img)
+    cv2.putText(window_img, str(nnn) , (50, 100), font, 1.5, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(window_img, "hot windows found: "+str(len(hot_windows_spat)) , (150, 100), font, 1.5, (255, 0, 255), 2, cv2.LINE_AA)
+    cv2.putText(window_img, "spatial bins: "+str(spatial_size) , (100, 150), font, 1, (255, 0, 255), 2, cv2.LINE_AA)
+    cv2.imwrite(folder+'/spat/spat_'+str(nnn)+'.jpg', window_img)
+
     window_img = lesson_functions.draw_boxes(draw_image, hot_windows_hist, color=(0, 255, 255), thick=2)                    
-    cv2.imwrite('video_caps/hist_'+str(nnn)+'.jpg', window_img)
+    cv2.putText(window_img, str(nnn) , (50, 100), font, 1.5, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(window_img, "hot windows found: "+str(len(hot_windows_hist)) , (150, 100), font, 1.5, (0, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(window_img, "hist_bins: "+str(hist_bins) , (100, 150), font, 1, (0, 255, 255), 2, cv2.LINE_AA)
+    cv2.imwrite(folder+'/hist/hist_'+str(nnn)+'.jpg', window_img)
+
     window_img = lesson_functions.draw_boxes(draw_image, hot_windows_hog , color=(255, 255, 0), thick=2)                    
-    cv2.imwrite('video_caps/hog_'+str(nnn)+'.jpg', window_img)
+    cv2.putText(window_img, str(nnn) , (50, 100), font, 1.5, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(window_img, "hot windows found: "+str(len(hot_windows_hog)) , (150, 100), font, 1.5, (255, 255, 0), 2, cv2.LINE_AA)
+    cv2.putText(window_img, "orient: "+str(orient)+"  pix_per_cell: "+str(pix_per_cell)+"  cell_per_block: "+str(cell_per_block)+"  hog_channel: "+str(hog_channel) , (100, 150), font, 1, (255, 255, 0), 2, cv2.LINE_AA)
+    cv2.imwrite(folder+'/hog/hog_'+str(nnn)+'.jpg', window_img)
+
     window_img = lesson_functions.draw_boxes(draw_image, hot_windows, color=(0, 0, 255), thick=2)                    
-    cv2.imwrite('video_caps/All_'+str(nnn)+'.jpg', window_img)
+    cv2.putText(window_img, str(nnn) , (50, 100), font, 1.5, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(window_img, "hot windows found: "+str(len(hot_windows)) , (150, 100), font, 1.5, (0, 0, 255), 2, cv2.LINE_AA)
+    cv2.putText(window_img, "abs_threshold: "+str(abs_threshold) + "  dyn_lim: "+str(dyn_lim)+ " = "+str(int(dyn_lim*len(hot_windows))) , (100, 150), font, 1, (0, 0, 255), 2, cv2.LINE_AA)
+    cv2.putText(window_img, "spat: "+str(len(hot_windows_spat))+"  hist: "+str(len(hot_windows_hist))+"  hog: "+str(len(hot_windows_hog)) , (100, 200), font, 1, (0, 0, 255), 2, cv2.LINE_AA)
     # document single image output
 #    '''
+
     global nnn
     nnn = nnn + 1
 	
@@ -184,26 +231,33 @@ def videopipe(video_image):
 #    threshold = 6
 #    dyn_threshold = int(burning_windows*0.15) # % of all frames must be overlapping object for detection
     dyn_threshold = int(burning_windows*dyn_lim) # % of all frames must be overlapping object for detection
-    labels = heatmap.heathot(hot_windows, draw_image, dyn_threshold)
+    labels, heat_max = heatmap.heathot(hot_windows, draw_image, dyn_threshold, abs_threshold)
+#    print("labels shape after: "+labels.shape)
     draw_img = heatmap.draw_labeled_bboxes(draw_image, labels)
+
+#    ''' for documentation purposes add results to output image
+    docu_img = heatmap.draw_labeled_bboxes(window_img, labels)
+    cv2.putText(docu_img, "heat_max: "+str(heat_max), (100, 250), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.imwrite(folder+'/all/all_'+str(nnn)+'.jpg', docu_img)
+#    '''
     
-    # label each frame with a counter for debugging
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    cv2.putText(draw_img, str(nnn) , (50, 100), font, 1.5, (255, 255, 255), 2, cv2.LINE_AA)
+    # label each frame with a counter for debugging / threshold
+    cv2.putText(draw_img, str(nnn) , (50, 100), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(draw_img, "hot windows found: "+str(len(hot_windows_hist)) , (150, 100), font, 1, (0, 0, 255), 2, cv2.LINE_AA)
+    cv2.imwrite(folder+'/output/out_'+str(nnn)+'.jpg', draw_img)
 	
     return draw_image
 
 
 
-#videoname = 'test_video_test.mp4' 
-videoname = 'project_video_dynthresh_all.mp4' 
+#videoname = 'test_video_test.mp4' labels
+videoname = folder+'/project_video_processed.mp4' 
 output = videoname
 #clip1 = VideoFileClip("input_video/test_video.mp4")
-clip1 = VideoFileClip("input_video/project_video.mp4")#.subclip(27, 28)
+clip1 = VideoFileClip("input_video/project_video.mp4").subclip(50.2, 50.5) # 2nd car approaching
+# clip1 = VideoFileClip("input_video/project_video.mp4").subclip(1, 1.3) # idle street
 clip = clip1.fl_image(videopipe) #NOTE: this function expects color images!!
 clip.write_videofile(output, audio=False)
 
-# 27 : additional frame in the wild 87x67 --> Filter settings!
-# 27-28 no detection of white car
 
 

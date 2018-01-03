@@ -56,7 +56,7 @@ def draw_labeled_bboxes(img, labels):
     # Return the image
     return img
 
-def heathot(hot_windows, test_image, dyn_threshold):
+def heathot(hot_windows, test_image, dyn_threshold, abs_threshold):
 
     box_list = hot_windows
     # create blank image 
@@ -64,16 +64,20 @@ def heathot(hot_windows, test_image, dyn_threshold):
     
     # Add heat to each box in box list
     heat = add_heat(heat,box_list)
-   
+    global heat_max
+    heat_max = np.amax(heat)
+#    print('heat_max = ' + heat_max)
+	
     # Apply dynamic threshold to help remove false positives
-    if dyn_threshold > 25:
+    if dyn_threshold > abs_threshold:
         heat = apply_threshold(heat, dyn_threshold)
     else:
-        heat = apply_threshold(heat, 200)	
+        heat = apply_threshold(heat, 2000)	# basically return empty heatmap
     # Visualize the heatmap when displaying    
     heatmap = np.clip(heat, 0, 255)
     
     # Find final boxes from heatmap using label function
     labels = label(heatmap)
-    
-    return labels
+#    print('labels shape = '+labels.shape)
+	
+    return labels, heat_max
