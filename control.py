@@ -46,20 +46,24 @@ dyn_lim = 0.1 # percentage of detections to locate object
 abs_threshold = 7 # no of min detections to detect object
 max_threshold = 12 # no of max detections to detect object
 abs_limit = 0 # At least that amount +1 must be detected in any filter
+history_threshold = 4
+history_length = 8
  
 #substart = 10.2; subend = 10.5 # single car, white, close
 #substart = 26.5; subend = 26.8 # single car, white, far
 #substart = 29.5; subend = 29.8 # 2 cars, white far, black close
-#substart = 39.5; subend = 39.8 # 2 cars, white close, black far
+#substart = 39.5; subend = 40.5 # 2 cars, white close, black far
 #substart = 49.5; subend = 49.8 # single car, black, far
 #substart = 33.5; subend = 33.8 # single car, black, far
 #substart = 27; subend = 28 # critical situation
 #substart = 23.6 ; subend = 24 # single white car, low abs_threshold needed due to extremely few numbers of windows
-#substart = 50.2; subend = 50.5 # 2nd car approaching
-#substart = 1 ; subend = 1.5 # idle street
+#substart = 50.2; subend = 50.8 # 2nd car approaching
+##substart = 1 ; subend = 1.5 # idle street
 
 
 substart = 0; subend = 50 # all
+
+#substart = 27; subend = 30 # 2nd car approaching
 
 
 import makegrid
@@ -71,13 +75,13 @@ import detect
 # Call detect.make_learnlist with the parameter samle_size to
 # get back a list of cars and non-cars
 # sample_size = 7880 # for making the carlist for training and validation
-sample_size = 9288 # for making the carlist for training and validation
+sample_size = 8000 # for making the carlist for training and validation
 
 import heatmap
 # Creating the heatmap rectangles
 
 
-train_model = 1  # If set, the model is trained again. Otherwise read in as data from previous run
+train_model = 0  # If set, the model is trained again. Otherwise read in as data from previous run
 
 
 #######################
@@ -200,7 +204,7 @@ cv2.imwrite(folder+'/testpic/'+test_file_name+'_All_criteria.jpg', window_img)
 dyn_threshold = int(burning_windows*dyn_lim) # 15% of all frames must be overlapping object for detection
 labels, heat_max = heatmap.heathot(hot_windows, test_image, dyn_threshold, abs_threshold, max_threshold)
 
-draw_img = heatmap.draw_labeled_bboxes(test_image_png, labels)
+draw_img = heatmap.draw_labeled_bboxes(test_image_png, labels)[0]
 cv2.imwrite(folder+'/testpic/'+test_file_name+'_heatmap.jpg', draw_img)
 
 
@@ -209,6 +213,12 @@ from IPython.display import HTML
 from PIL import Image
 
 nnn = 0
+
+global history
+#history = []
+from collections import deque
+history = deque(maxlen = history_length)
+
 
 def videopipe(video_image):
     # this is the way to treat each videoframe
@@ -279,14 +289,45 @@ def videopipe(video_image):
     dyn_threshold = int(burning_windows*dyn_lim) # % of all frames must be overlapping object for detection
     labels, heat_max = heatmap.heathot(hot_windows, draw_image, dyn_threshold, abs_threshold, max_threshold)
 #    print("labels shape after: "+labels.shape)
-    if (len(hot_windows_spat) > abs_limit) and (len(hot_windows_hist) > abs_limit) and (len(hot_windows_hog) > abs_limit): # there have to be at least some detections in each filter
-        draw_image = heatmap.draw_labeled_bboxes(draw_image, labels)
+
+
+##############################
+# Another filter function added with love to the Udacity reviewers
+##############################
+
+    # generate list of boundary boxes 
+    bbox_list = heatmap.draw_labeled_bboxes(video_image_png, labels)[1]
+
+#    print("before append: "+str(history))
+
+    history.append(bbox_list)    
+#    print("after append: "+str(history))
+#    print(hot_windows_hist)
+
+    tmp = []
+    for n in history:
+        tmp.extend(n)
+
+#    print("tmp = ")
+#    print(tmp)
+		
+#    print(history[0].shape)
+    if nnn > history_length+1:
+        labels = heatmap.heathot(tmp, draw_image, history_threshold, -1, 100)[0]
+
+#    print(bbox_list)
+#    print(len(bbox_list))
+#    print(np.amax(bbox_list))
+#    print(labels[0].shape)
+		
+    if (len(hot_windows_spat) > abs_limit) and (len(hot_windows_hist) > abs_limit) and (len(hot_windows_hog) > abs_limit): # there have to be at least some detections in each filter        
+        draw_image = heatmap.draw_labeled_bboxes(draw_image, labels)[0]
 #    else:
 #        draw_img = draw_image
 
 #    ''' for documentation purposes add results to output image
     if (len(hot_windows_spat) > abs_limit) and (len(hot_windows_hist) > abs_limit) and (len(hot_windows_hog) > abs_limit): # there have to be at least some detections in each filter
-        docu_img = heatmap.draw_labeled_bboxes(window_img, labels)
+        docu_img = heatmap.draw_labeled_bboxes(window_img, labels)[0]
     else:
         docu_img = window_img
     cv2.putText(docu_img, "heat_max: "+str(heat_max), (100, 250), font, 1, (255, 255, 255), 2, cv2.LINE_AA)

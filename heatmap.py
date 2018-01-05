@@ -16,7 +16,17 @@ def add_heat(heatmap, bbox_list):
         # Assuming each "box" takes the form ((x1, y1), (x2, y2))
 #        if ((box[0][1]-box[1][1])*(box[1][0]-box[0][0]))>4096: # min detection 64x64px
 #            print(str((box[0][1]-box[1][1])*(box[1][0]-box[0][0])))
-        heatmap[box[1][1]:box[0][1], box[0][0]:box[1][0]] += 1
+#        print(box)
+        x = (box[1][1], box[0][1])
+        y = (box[0][0], box[1][0])
+        maxix = np.amax(x)
+        minix = np.amin(x)
+        maxiy = np.amax(y)
+        miniy = np.amin(y)
+
+        heatmap[minix:maxix, miniy:maxiy] += 1
+#        heatmap[box[1][1]:box[0][1], box[0][0]:box[1][0]] += 1
+
 ##      test_img = cv2.resize(img[window[0][1]:window[1][1], window[0][0]:window[1][0]], (64, 64))      
 #       test_img = cv2.resize(img[window[1][1]:window[0][1], window[0][0]:window[1][0]], (64, 64))      
 
@@ -31,6 +41,7 @@ def apply_threshold(heatmap, threshold):
 
 def draw_labeled_bboxes(img, labels):
     # Iterate through all detected cars
+    bbox_list = []
     for car_number in range(1, labels[1]+1):
         # Find pixels with each car_number label value
         color = (0,0,0)
@@ -50,11 +61,12 @@ def draw_labeled_bboxes(img, labels):
         bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
         # Draw the box on the image
 #        print((bbox[1][1]-bbox[0][1])*(bbox[1][0]-bbox[0][0]))
-        if ((bbox[1][1]-bbox[0][1])*(bbox[1][0]-bbox[0][0]))>2500: # min detection 50x50px
+        if ((bbox[1][1]-bbox[0][1])*(bbox[1][0]-bbox[0][0]))>1600: # min detection 40x40px
 #            print(str((box[0][1]-box[1][1])*(box[1][0]-box[0][0])))
             cv2.rectangle(img, bbox[0], bbox[1], color, 6)
+            bbox_list.append(bbox)
     # Return the image
-    return img
+    return img, bbox_list
 
 def heathot(hot_windows, test_image, dyn_threshold, abs_threshold, max_threshold):
 
@@ -66,16 +78,20 @@ def heathot(hot_windows, test_image, dyn_threshold, abs_threshold, max_threshold
     heat = add_heat(heat,box_list)
     global heat_max
     heat_max = np.amax(heat)
+#    print("run: ")
+#    print("heat max = "+str(heat_max))
+#    print("hot windows: "+str(hot_windows))
 #    print('heat_max = ' + heat_max)
 	
     # Apply dynamic threshold to help remove false positives
     if dyn_threshold <= abs_threshold :
         heat = apply_threshold(heat, abs_threshold)	# basically return empty heatmap
 #        print('too low: abs_threshold= '+str(abs_threshold)+' dyn_threshold= '+str(dyn_threshold))
-    if dyn_threshold > abs_threshold and dyn_threshold < max_threshold:
+    if dyn_threshold > abs_threshold and dyn_threshold <= max_threshold:
         heat = apply_threshold(heat, dyn_threshold)
-#        print('middle detected')
-    if dyn_threshold > max_threshold-1 :
+#        print('middle detected= '+str(dyn_threshold))
+#        print(str(np.amax(heat)))
+    if dyn_threshold > max_threshold :
         heat = apply_threshold(heat, max_threshold)
 #        print('too high')
     # Visualize the heatmap when displaying    
